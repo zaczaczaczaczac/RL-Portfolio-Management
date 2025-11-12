@@ -5,7 +5,7 @@ import pandas as pd
 from src.data_loader import load_split_freq
 from src.features import to_log_returns, build_features
 from src.envs import PortfolioEnv
-from src.baselines import buy_and_hold, equal_weight_daily
+from src.baselines import buy_and_hold, equal_weight
 from src.evaluate import ann_metrics, plot_equity
 
 WINDOW = 20
@@ -38,12 +38,12 @@ def run_train_test_daily():
     rl_ret = pd.Series(rets, index=idx)
     rl_cum = rl_ret.cumsum()
     # baselines 也用同一时段对齐
-    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]   # 从第 WINDOW 行开始
-    ew_r, ew_cum = equal_weight_daily(test_slice)
+    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
+    ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
-    
+
     # 5) 基线
-    ew_r, ew_cum = equal_weight_daily(test_r.loc[test_f.index])
+    ew_r, ew_cum = equal_weight(test_r.loc[test_f.index])
     bh_r, bh_cum = buy_and_hold(test_r.loc[test_f.index])
 
     # 6) 指标与图
