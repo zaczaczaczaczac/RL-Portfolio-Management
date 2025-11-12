@@ -26,6 +26,12 @@ def _ticker_from_filename(path: str) -> str:
     base = os.path.basename(path)
     return base.split("_")[0].upper()
 
+def _strip_tz(idx: pd.DatetimeIndex) -> pd.DatetimeIndex:
+    """把带时区/混合时区索引统一成 naive 时间（UTC→naive）。"""
+    if getattr(idx, "tz", None) is not None:
+        return idx.tz_convert("UTC").tz_localize(None)
+    return idx
+
 def _read_one_csv(path: str) -> pd.Series:
     df = pd.read_csv(path)
     df.columns = [c.strip() for c in df.columns]
@@ -33,12 +39,12 @@ def _read_one_csv(path: str) -> pd.Series:
     dcol = _detect_date_col(df)
     pcol = _detect_price_col(df)
 
-    s = (df.assign(**{dcol: pd.to_datetime(df[dcol], errors="coerce")})
-           .dropna(subset=[dcol])
-           .sort_values(dcol)
-           .set_index(dcol)[pcol]
-           .astype("float64"))
-    s = s[~s.index.duplicated(keep="first")]
+    df[dcol] = pd.to_datetime(df[dcol], errors="coerce", utc=True)
+    df = df.dropna(subset=[dcol]).sort_values(dcol).set_index(dcol)
+
+    s = df[pcol].astype("float64")
+    s.index = _strip_tz(s.index)              # 去掉时区，统一成 naive datetime
+    s = s[~s.index.duplicated(keep="first")]  # 去重
     s.name = _ticker_from_filename(path)
     return s
 
