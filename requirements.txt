@@ -5,3 +5,4 @@ gymnasium
 torch
 stable-baselines3
 tqdm
+git+https://github.com/AI4Finance-Foundation/FinRL.git
