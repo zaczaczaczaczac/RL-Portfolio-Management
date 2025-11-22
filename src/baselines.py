@@ -23,7 +23,7 @@ def _is_rebalance_day(idx: pd.DatetimeIndex, freq: str, t: int) -> bool:
     # 默认不再平衡
     return False
 
-def buy_and_hold(returns: pd.DataFrame):
+def buy_and_hold(returns: pd.DataFrame, cost_bps: float = 0.0):
     """
     真正的 Buy-and-Hold（用 log return 严谨实现）：
     - t=0 等权
@@ -34,6 +34,7 @@ def buy_and_hold(returns: pd.DataFrame):
     R = returns.values              # log returns [T,N]
     growth = np.exp(R)              # 每日增长因子
     N = returns.shape[1]
+    fee = cost_bps / 1e-4
 
     w = np.ones(N) / N              # 初始等权
     out = []
@@ -43,6 +44,12 @@ def buy_and_hold(returns: pd.DataFrame):
         port_growth = float(np.dot(w, growth[t]))
         # 当日组合 log 回报
         r_port = np.log(port_growth)
+
+        # For intial transaction fee to enter the market
+        if t == 0 and fee > 0:
+            turnover = np.abs(w).sum()  
+            r_port -= fee * turnover
+
         out.append(r_port)
 
         # 用当日增长后更新“自然漂移”的新权重（不再平衡）
@@ -73,6 +80,7 @@ def equal_weight(returns: pd.DataFrame, freq: str = 'M', cost_bps: float = 0.0):
         r_port = np.log(port_growth)
 
         # 是否再平衡
+        # initial transaction fee for entering the market is applied
         if _is_rebalance_day(idx, freq, t):
             w_new = np.ones(N) / N
             turnover = np.abs(w_new - w).sum()
@@ -81,7 +89,7 @@ def equal_weight(returns: pd.DataFrame, freq: str = 'M', cost_bps: float = 0.0):
         else:
             # 非再平衡日，权重自然漂移（以便下一次再平衡时计算换手）
             w = (w * growth[t]) / (port_growth + 1e-12)
-
+        
         out.append(r_port)
 
     ser = pd.Series(out, index=idx)
