@@ -34,7 +34,7 @@ def buy_and_hold(returns: pd.DataFrame, cost_bps: float = 0.0):
     R = returns.values              # log returns [T,N]
     growth = np.exp(R)              # 每日增长因子
     N = returns.shape[1]
-    fee = cost_bps / 1e-4
+    fee = cost_bps / 1e4
 
     w = np.ones(N) / N              # 初始等权
     out = []
