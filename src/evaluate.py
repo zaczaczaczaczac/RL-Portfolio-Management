@@ -27,3 +27,31 @@ def plot_equity(curves: dict, path_png: str):
 
     plt.savefig(path_png, dpi=150)
     plt.close()
+
+def save_equity_to_csv(res: dict, path_csv: str):
+    # create a new folder if current folder doesn't exist
+    dir_name = os.path.dirname(path_csv)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    
+    eq_list = [i for i, _ in res.items()]
+    res_list = [r for _, r in res.items()]
+    df = pd.DataFrame(data=res_list, index=eq_list)
+    df.to_csv(path_csv)
+    return None
+
+def save_cum_ret_to_csv(cum_ret_dict: dict, path_csv: str):
+    dir_name = os.path.dirname(path_csv)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+
+    equity_list = [i for i, _ in cum_ret_dict.items()]
+    ppo = cum_ret_dict["PPO"]
+    dqn = cum_ret_dict["DQN"]
+    ew = cum_ret_dict["EW"]
+    bh = cum_ret_dict["BH"]
+    
+    df = pd.concat([ppo, dqn, ew, bh], axis=1)
+    df.columns = equity_list
+    df.to_csv(path_csv)
+    return None

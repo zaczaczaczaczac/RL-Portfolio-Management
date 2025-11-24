@@ -6,7 +6,7 @@ from src.data_loader import load_split_freq
 from src.features import to_log_returns, build_features
 from src.envs import PortfolioEnv
 from src.baselines import buy_and_hold, equal_weight
-from src.evaluate import ann_metrics, plot_equity
+from src.evaluate import ann_metrics, plot_equity, save_equity_to_csv, save_cum_ret_to_csv
 
 WINDOW = 20
 COST_BPS = 20
@@ -58,6 +58,7 @@ def run_train_test_daily():
     metrics_dict["EW"] = ann_metrics(ew_r)
     metrics_dict["BH"] = ann_metrics(bh_r)
     metrics_path = "results/metrics/daily_metrics.csv"
+    save_equity_to_csv(metrics_dict, metrics_path)
 
     equity_daily_dict = dict()
     equity_daily_dict["PPO"] = rl_cum
@@ -65,13 +66,13 @@ def run_train_test_daily():
     equity_daily_dict["EW"] = ew_cum
     equity_daily_dict["BH"] = bh_cum
     equity_daily_path = "results/metrics/daily_equity.csv"
-    
+    save_cum_ret_to_csv(equity_daily_dict, equity_daily_path)
 
-    plot_equity(
-        {"RL_PPO": rl_cum, "EW": ew_cum, "BH": bh_cum},
-        "results/figures/equity_daily.png"
-    )
-    print("Saved figure -> results/figures/equity_daily.png")
+    # plot_equity(
+    #     {"RL_PPO": rl_cum, "EW": ew_cum, "BH": bh_cum},
+    #     "results/figures/equity_daily.png"
+    # )
+    # print("Saved figure -> results/figures/equity_daily.png")
 
 if __name__ == "__main__":
     run_train_test_daily()
