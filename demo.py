@@ -52,6 +52,21 @@ def run_train_test_daily():
     print("  EW :", ann_metrics(ew_r))
     print("  BH :", ann_metrics(bh_r))
 
+    metrics_dict = dict()
+    metrics_dict["PPO"] = ann_metrics(rl_ret)
+    metrics_dict["DQN"] = ann_metrics(rl_ret) # temp placeholder
+    metrics_dict["EW"] = ann_metrics(ew_r)
+    metrics_dict["BH"] = ann_metrics(bh_r)
+    metrics_path = "results/metrics/daily_metrics.csv"
+
+    equity_daily_dict = dict()
+    equity_daily_dict["PPO"] = rl_cum
+    equity_daily_dict["DQN"] = rl_cum  # temp placeholder
+    equity_daily_dict["EW"] = ew_cum
+    equity_daily_dict["BH"] = bh_cum
+    equity_daily_path = "results/metrics/daily_equity.csv"
+    
+
     plot_equity(
         {"RL_PPO": rl_cum, "EW": ew_cum, "BH": bh_cum},
         "results/figures/equity_daily.png"
