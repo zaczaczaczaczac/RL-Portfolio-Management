@@ -16,16 +16,16 @@ class PPOHyperparams():
     policy: str = "MlpPolicy"
     verbose: int = 0 
     learning_rate: Union[float, Callable[[float], float]] = 3e-4
-    batch_size: int = 64
+    batch_size: int = 32
     n_steps: int = 2048
-    n_epochs: int = 15
+    n_epochs: int = 10
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_range: Union[float, Callable[[float], float]] = 0.2
-    ent_coef: float = 0.0
+    ent_coef: float = 0.01
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
-    seed: int = 52
+    seed: int = 42
     device: Union[str, Any] = "auto"
 
 
