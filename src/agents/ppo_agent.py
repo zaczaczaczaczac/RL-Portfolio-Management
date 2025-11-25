@@ -5,6 +5,7 @@ import stable_baselines3 as sb3
 from dataclasses import dataclass
 from typing import Optional, Callable, Any, Dict, Union
 import gymnasium as gym
+from stable_baselines3.common.callbacks import BaseCallback
 
 @dataclass
 class PPOHyperparams():
@@ -52,7 +53,7 @@ class PPO_Agent:
             **self.model_kwargs
         )
 
-    def learn(self, timesteps: int, log_interval: int = 1, pbar: bool = False, callback: Optional[Callable]=None):
+    def learn(self, timesteps: int, log_interval: int = 1, pbar: bool = False, callback: Optional[BaseCallback]=None):
         self.model.learn(total_timesteps=timesteps, log_interval=log_interval, callback=callback, progress_bar=pbar)
         return self
     
