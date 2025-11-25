@@ -6,7 +6,8 @@ from src.data_loader import load_split_freq
 from src.features import to_log_returns, build_features
 from src.envs import PortfolioEnv
 from src.baselines import buy_and_hold, equal_weight
-from src.evaluate import ann_metrics, plot_equity
+from src.agents.ppo_agent import PPO_Agent, PPOHyperparams
+from src.evaluate import ann_metrics, plot_equity, save_equity_to_csv, save_cum_ret_to_csv
 
 WINDOW = 20
 COST_BPS = 20
@@ -27,11 +28,25 @@ def run_train_test_daily_raw():
         train_f,
         window=WINDOW,
         cost_bps=COST_BPS,
-        reward_mode="raw",      # ✅ 明确写 raw
+        reward_mode="raw",      # raw mode
         lambda_risk=0.0,
     )
-    model = PPO("MlpPolicy", env, verbose=0)
-    model.learn(total_timesteps=TIMESTEPS)
+    # model = PPO("MlpPolicy", env, verbose=0)
+    # model.learn(total_timesteps=TIMESTEPS)
+
+    # init PPO agent and hyperparams
+    raw_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=4e-4, 
+        n_epochs=15, 
+        batch_size=32,
+        n_steps=2048,
+        gae_lambda=0.99
+    )
+
+    print("raw ppo agent initiated")
+    raw_PPO_agent = PPO_Agent(env, h_params=raw_ppo_hyperparams)
+    raw_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
     # 4) 测试回测（raw reward）
     test_env = PortfolioEnv(
@@ -45,7 +60,7 @@ def run_train_test_daily_raw():
     obs, _ = test_env.reset()
     rets, done = [], False
     while not done:
-        action, _ = model.predict(obs, deterministic=True)
+        action = raw_PPO_agent.make_action(obs, deterministic=True)
         obs, r, done, _, _ = test_env.step(action)
         rets.append(r)
 
@@ -87,8 +102,20 @@ def run_train_test_daily_risk():
         lambda_risk=5.0,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
         vol_window=20,
     )
-    model = PPO("MlpPolicy", env, verbose=0)
-    model.learn(total_timesteps=TIMESTEPS)
+    # model = PPO("MlpPolicy", env, verbose=0)
+    # model.learn(total_timesteps=TIMESTEPS)
+    risk_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=4e-4, 
+        n_epochs=15, 
+        batch_size=32,
+        n_steps=2048,
+        gae_lambda=0.99
+    )
+
+    print("risk ppo agent initiated")
+    risk_PPO_agent = PPO_Agent(env, h_params=risk_ppo_hyperparams)
+    risk_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
     # 3) 测试回测（risk 模式）
     test_env = PortfolioEnv(
@@ -97,13 +124,13 @@ def run_train_test_daily_risk():
         window=WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",
-        lambda_risk=5.0,
+        lambda_risk=3.0,
         vol_window=20,
     )
     obs, _ = test_env.reset()
     rets, done = [], False
     while not done:
-        action, _ = model.predict(obs, deterministic=True)
+        action = risk_PPO_agent.make_action(obs, deterministic=True)
         obs, r, done, _, _ = test_env.step(action)
         rets.append(r)
 

@@ -31,6 +31,7 @@ class PPOHyperparams():
 
 class PPO_Agent:
     def __init__(self, env: gym.Env, h_params: PPOHyperparams = PPOHyperparams(), model_kwargs: Optional[Dict[str, Any]]=None):
+        self.model_name = "PPO_Agent"
         self.env = env
         self.h_params = h_params
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
@@ -49,12 +50,13 @@ class PPO_Agent:
             max_grad_norm=h_params.max_grad_norm,
             verbose=h_params.verbose,
             seed=h_params.seed,
-            device=h_params.device
+            device=h_params.device,
             **self.model_kwargs
         )
 
     def learn(self, timesteps: int, log_interval: int = 1, pbar: bool = False, callback: Optional[BaseCallback]=None):
         self.model.learn(total_timesteps=timesteps, log_interval=log_interval, callback=callback, progress_bar=pbar)
+        print(f"{self.model_name} learning completed")
         return self
     
     def make_action(self, obs: np.darray, deterministic: bool = True):

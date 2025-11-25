@@ -5,3 +5,4 @@ gymnasium
 torch
 stable-baselines3
 tqdm
+rich
