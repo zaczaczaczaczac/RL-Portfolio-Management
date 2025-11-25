@@ -94,13 +94,16 @@ class PortfolioEnv(gym.Env):
         cost = self.cost * turnover
 
         r_t = float((self.w * self.returns[self.t]).sum())   # 组合log return
-        # 计算风险惩罚
-        risk_penalty = self._compute_risk_penalty(r_t)
-
-        reward = r_t - cost - risk_penalty
+        # r_t = float((w_target * self.returns[self.t]).sum()) 
 
         self.w = w_target
         self.t += 1
+
+         # 计算风险惩罚
+        risk_penalty = self._compute_risk_penalty(r_t)
+        # print(r_t, cost, risk_penalty)
+
+        reward = r_t - cost - risk_penalty
         terminated = self.t >= self.T
         info = {
             "turnover": turnover,

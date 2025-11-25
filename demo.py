@@ -47,7 +47,7 @@ def run_train_test_daily_raw():
 
     print("raw ppo agent initiated")
     raw_PPO_agent = PPO_Agent(env, h_params=raw_ppo_hyperparams)
-    raw_PPO_agent.learn(timesteps=TIMESTEPS, pbar=False)
+    raw_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
     # 4) 测试回测（raw reward）
     test_env = PortfolioEnv(
@@ -118,8 +118,8 @@ def run_train_test_daily_risk():
         window=WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",     # ✅ 使用 risk 模式
-        lambda_risk=5.0,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
-        vol_window=20,
+        lambda_risk=0.02,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
+        vol_window=15,
     )
     # model = PPO("MlpPolicy", env, verbose=0)
     # model.learn(total_timesteps=TIMESTEPS)
@@ -135,7 +135,7 @@ def run_train_test_daily_risk():
 
     print("risk ppo agent initiated")
     risk_PPO_agent = PPO_Agent(env, h_params=risk_ppo_hyperparams)
-    risk_PPO_agent.learn(timesteps=TIMESTEPS, pbar=False)
+    risk_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
     # 3) 测试回测（risk 模式）
     test_env = PortfolioEnv(
@@ -144,8 +144,8 @@ def run_train_test_daily_risk():
         window=WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",
-        lambda_risk=3.0,
-        vol_window=20,
+        lambda_risk=0.02,
+        vol_window=15,
     )
     obs, _ = test_env.reset()
     rets, done = [], False
