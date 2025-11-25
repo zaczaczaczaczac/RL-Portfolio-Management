@@ -6,11 +6,12 @@ from src.data_loader import load_split_freq
 from src.features import to_log_returns, build_features
 from src.envs import PortfolioEnv
 from src.baselines import buy_and_hold, equal_weight
-from src.evaluate import ann_metrics, plot_equity
+from src.agents.ppo_agent import PPO_Agent, PPOHyperparams
+from src.evaluate import ann_metrics, plot_equity, save_equity_to_csv, save_cum_ret_to_csv
 
 WINDOW = 20
 COST_BPS = 20
-TIMESTEPS = 200_000  # 先跑个小步数，确认流程
+TIMESTEPS = 350_000  # 先跑个小步数，确认流程
 
 def run_train_test_daily_raw():
     # 1) 读价格（train/test, daily）
@@ -27,11 +28,26 @@ def run_train_test_daily_raw():
         train_f,
         window=WINDOW,
         cost_bps=COST_BPS,
-        reward_mode="raw",      # ✅ 明确写 raw
+        reward_mode="raw",      # raw mode
         lambda_risk=0.0,
     )
-    model = PPO("MlpPolicy", env, verbose=0)
-    model.learn(total_timesteps=TIMESTEPS)
+    # model = PPO("MlpPolicy", env, verbose=0)
+    # model.learn(total_timesteps=TIMESTEPS)
+
+    # init PPO agent and hyperparams
+    raw_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=4e-4, 
+        n_epochs=10, 
+        batch_size=32,
+        n_steps=2048,
+        gae_lambda=0.99,
+        ent_coef=0.05
+    )
+
+    print("raw ppo agent initiated")
+    raw_PPO_agent = PPO_Agent(env, h_params=raw_ppo_hyperparams)
+    raw_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
     # 4) 测试回测（raw reward）
     test_env = PortfolioEnv(
@@ -45,7 +61,7 @@ def run_train_test_daily_raw():
     obs, _ = test_env.reset()
     rets, done = [], False
     while not done:
-        action, _ = model.predict(obs, deterministic=True)
+        action = raw_PPO_agent.make_action(obs, deterministic=True)
         obs, r, done, _, _ = test_env.step(action)
         rets.append(r)
 
@@ -58,6 +74,8 @@ def run_train_test_daily_raw():
     ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
 
+
+    # record results as plot and csv
     print("Metrics (RAW reward):")
     print("  PPO:", ann_metrics(rl_ret))
     print("  EW :", ann_metrics(ew_r))
@@ -68,6 +86,22 @@ def run_train_test_daily_raw():
         "results/figures/equity_daily_raw.png"
     )
     print("Saved figure -> results/figures/equity_daily_raw.png")
+
+    metrics_dict = dict()
+    metrics_dict["PPO"] = ann_metrics(rl_ret)
+    metrics_dict["DQN"] = ann_metrics(rl_ret) # temp placeholder
+    metrics_dict["EW"] = ann_metrics(ew_r)
+    metrics_dict["BH"] = ann_metrics(bh_r)
+    metrics_path = "results/metrics/raw_daily_metrics.csv"
+    save_equity_to_csv(metrics_dict, metrics_path)
+
+    equity_daily_dict = dict()
+    equity_daily_dict["PPO"] = rl_cum
+    equity_daily_dict["DQN"] = rl_cum  # temp placeholder
+    equity_daily_dict["EW"] = ew_cum
+    equity_daily_dict["BH"] = bh_cum
+    equity_daily_path = "results/metrics/raw_daily_accumalated_equity.csv"
+    save_cum_ret_to_csv(equity_daily_dict, equity_daily_path)
 
 def run_train_test_daily_risk():
     # 1) 读价格（与 raw 相同）
@@ -84,11 +118,24 @@ def run_train_test_daily_risk():
         window=WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",     # ✅ 使用 risk 模式
-        lambda_risk=5.0,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
-        vol_window=20,
+        lambda_risk=0.02,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
+        vol_window=15,
     )
-    model = PPO("MlpPolicy", env, verbose=0)
-    model.learn(total_timesteps=TIMESTEPS)
+    # model = PPO("MlpPolicy", env, verbose=0)
+    # model.learn(total_timesteps=TIMESTEPS)
+    risk_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=4e-4, 
+        n_epochs=10, 
+        batch_size=32,
+        n_steps=2048,
+        gae_lambda=0.99,
+        ent_coef=0.05
+    )
+
+    print("risk ppo agent initiated")
+    risk_PPO_agent = PPO_Agent(env, h_params=risk_ppo_hyperparams)
+    risk_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
     # 3) 测试回测（risk 模式）
     test_env = PortfolioEnv(
@@ -97,13 +144,13 @@ def run_train_test_daily_risk():
         window=WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",
-        lambda_risk=5.0,
-        vol_window=20,
+        lambda_risk=0.02,
+        vol_window=15,
     )
     obs, _ = test_env.reset()
     rets, done = [], False
     while not done:
-        action, _ = model.predict(obs, deterministic=True)
+        action = risk_PPO_agent.make_action(obs, deterministic=True)
         obs, r, done, _, _ = test_env.step(action)
         rets.append(r)
 
@@ -126,6 +173,24 @@ def run_train_test_daily_risk():
         "results/figures/equity_daily_risk.png"
     )
     print("Saved figure -> results/figures/equity_daily_risk.png")
+
+    metrics_dict = dict()
+    metrics_dict["PPO"] = ann_metrics(rl_ret)
+    metrics_dict["DQN"] = ann_metrics(rl_ret) # temp placeholder
+    metrics_dict["EW"] = ann_metrics(ew_r)
+    metrics_dict["BH"] = ann_metrics(bh_r)
+    metrics_path = "results/metrics/risk_daily_metrics.csv"
+    save_equity_to_csv(metrics_dict, metrics_path)
+
+    equity_daily_dict = dict()
+    equity_daily_dict["PPO"] = rl_cum
+    equity_daily_dict["DQN"] = rl_cum  # temp placeholder
+    equity_daily_dict["EW"] = ew_cum
+    equity_daily_dict["BH"] = bh_cum
+    equity_daily_path = "results/metrics/risk_daily_accumalated_equity.csv"
+    save_cum_ret_to_csv(equity_daily_dict, equity_daily_path)
+
+
 
 if __name__ == "__main__":
     run_train_test_daily_raw()
