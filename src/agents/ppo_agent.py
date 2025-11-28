@@ -26,7 +26,7 @@ class PPOHyperparams():
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
     seed: int = 42
-    device: Union[str, Any] = "auto"
+    device: Union[str, Any] = "cpu"
 
 
 class PPO_Agent:
@@ -59,7 +59,7 @@ class PPO_Agent:
         print(f"{self.model_name} learning completed")
         return self
     
-    def make_action(self, obs: np.darray, deterministic: bool = True):
+    def make_action(self, obs: np.ndarray, deterministic: bool = True):
         action, _ = self.model.predict(obs, deterministic=deterministic)
         return action
     
