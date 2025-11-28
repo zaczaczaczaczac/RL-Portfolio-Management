@@ -1,13 +1,15 @@
 # demo.py
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO  # (optional, only used indirectly via PPO_Agent)
 import pandas as pd
 
 from src.data_loader import load_split_freq
 from src.features import to_log_returns, build_features
-from src.envs import PortfolioEnv
+from src.envs import PortfolioEnv, DiscretePortfolioEnv       
 from src.baselines import buy_and_hold, equal_weight
 from src.agents.ppo_agent import PPO_Agent, PPOHyperparams
+from src.agents.dqn_agent import DQN_Agent, DQNHyperparams    
 from src.evaluate import ann_metrics, plot_equity, save_equity_to_csv, save_cum_ret_to_csv
+
 
 WINDOW = 20
 COST_BPS = 20
