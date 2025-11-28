@@ -26,7 +26,7 @@ class PPOHyperparams():
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
     seed: int = 42
-    device: Union[str, Any] = "auto"
+    device: Union[str, Any] = "cpu"
 
 
 class PPO_Agent:
