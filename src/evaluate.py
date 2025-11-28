@@ -48,10 +48,11 @@ def save_cum_ret_to_csv(cum_ret_dict: dict, path_csv: str):
     equity_list = [i for i, _ in cum_ret_dict.items()]
     ppo = cum_ret_dict["PPO"]
     dqn = cum_ret_dict["DQN"]
+    ppo_lstm = cum_ret_dict["PPO_LSTM"]
     ew = cum_ret_dict["EW"]
     bh = cum_ret_dict["BH"]
     
-    df = pd.concat([ppo, dqn, ew, bh], axis=1)
+    df = pd.concat([ppo, dqn, ppo_lstm, ew, bh], axis=1)
     df.columns = equity_list
     df.to_csv(path_csv)
     return None

@@ -47,8 +47,8 @@ def train_ppo_and_dqn(
 
     raw_ppo_hyperparams = PPOHyperparams(
         policy="MlpPolicy",
-        learning_rate=3e-4,
-        n_epochs=12,
+        learning_rate=4e-4,
+        n_epochs=10,
         batch_size=32,
         n_steps=2048,
         gae_lambda=0.99,
@@ -57,8 +57,8 @@ def train_ppo_and_dqn(
 
     raw_ppo_lstm_hyperparams = PPOLSTMHyperparams(
         policy="MlpLstmPolicy",
-        learning_rate=3e-4,
-        n_epochs=12,
+        learning_rate=4e-4,
+        n_epochs=10,
         batch_size=32,
         n_steps=2048,
         gae_lambda=0.99,
@@ -269,7 +269,7 @@ def run_train_test_daily_risk():
     print("  BH      :", ann_metrics(bh_r))
 
     plot_equity(
-        {"PPO_risk": ppo_cum, "DQN_risk": dqn_cum, "EW": ew_cum, "BH": bh_cum},
+        {"PPO_risk": ppo_cum, "PPO_LSTM_risk": ppo_lstm_cum, "DQN_risk": dqn_cum, "EW": ew_cum, "BH": bh_cum},
         "results/figures/equity_daily_risk.png",
     )
     print("Saved figure -> results/figures/equity_daily_risk.png")
@@ -277,6 +277,7 @@ def run_train_test_daily_risk():
     metrics_dict = {
         "PPO": ann_metrics(ppo_ret),
         "DQN": ann_metrics(dqn_ret),
+        "PPO_LSTM": ann_metrics(ppo_lstm_ret), 
         "EW": ann_metrics(ew_r),
         "BH": ann_metrics(bh_r),
     }
@@ -286,6 +287,7 @@ def run_train_test_daily_risk():
     equity_daily_dict = {
         "PPO": ppo_cum,
         "DQN": dqn_cum,
+        "PPO_LSTM": ppo_lstm_cum, 
         "EW": ew_cum,
         "BH": bh_cum,
     }
@@ -298,21 +300,23 @@ def run_train_test_daily_risk():
 # -------------------- HOURLY / RAW -------------------- #
 
 def run_train_test_hourly_raw():
+    # 1) load prices (train/test, daily)
     train_prices = load_split_freq(split="train", freq="hourly")
     test_prices = load_split_freq(split="test", freq="hourly")
 
+    # 2) log returns + features
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # train PPO + DQN (raw reward)
-    ppo_agent, dqn_agent = train_ppo_and_dqn(
+    # 3) train PPO + DQN (raw reward)
+    ppo_agent, dqn_agent, ppo_lstm_agent = train_ppo_and_dqn(
         train_r,
         train_f,
         reward_mode="raw",
         lambda_risk=0.0,
     )
 
-    # test envs
+    # 4) test envs (raw reward)
     ppo_test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -332,46 +336,59 @@ def run_train_test_hourly_raw():
 
     ppo_rets = eval_agent(ppo_agent, ppo_test_env)
     dqn_rets = eval_agent(dqn_agent, dqn_test_env)
+    ppo_lstm_rets = eval_agent(ppo_lstm_agent, ppo_test_env)
 
+    # align with dates: drop first WINDOW steps
     idx = test_f.index[WINDOW:]
     ppo_ret = pd.Series(ppo_rets, index=idx)
     dqn_ret = pd.Series(dqn_rets, index=idx)
+    ppo_lstm_ret = pd.Series(ppo_lstm_rets, index=idx)
+
     ppo_cum = ppo_ret.cumsum()
     dqn_cum = dqn_ret.cumsum()
+    ppo_lstm_cum = ppo_lstm_ret.cumsum()
 
+    # baselines on the same period
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
 
+    # metrics print
     print("Metrics (HOURLY, RAW reward):")
     print("  PPO:", ann_metrics(ppo_ret))
+    print("  PPO_LSTM", ann_metrics(ppo_lstm_ret))
     print("  DQN:", ann_metrics(dqn_ret))
     print("  EW :", ann_metrics(ew_r))
     print("  BH :", ann_metrics(bh_r))
 
+    # equity curve figure
     plot_equity(
-        {"PPO_raw": ppo_cum, "DQN_raw": dqn_cum, "EW": ew_cum, "BH": bh_cum},
+        {"PPO_raw": ppo_cum, "PPO_LSTM_raw": ppo_lstm_cum, "DQN_raw": dqn_cum, "EW": ew_cum, "BH": bh_cum},
         "results/figures/equity_hourly_raw.png",
     )
     print("Saved figure -> results/figures/equity_hourly_raw.png")
 
+    # metrics CSV
     metrics_dict = {
         "PPO": ann_metrics(ppo_ret),
         "DQN": ann_metrics(dqn_ret),
+        "PPO_LSTM": ann_metrics(ppo_lstm_ret), 
         "EW": ann_metrics(ew_r),
         "BH": ann_metrics(bh_r),
     }
     metrics_path = "results/metrics/raw_hourly_metrics.csv"
     save_equity_to_csv(metrics_dict, metrics_path)
 
-    equity_dict = {
+    # accumulated equity CSV
+    equity_hourly_dict = {
         "PPO": ppo_cum,
         "DQN": dqn_cum,
+        "PPO_LSTM": ppo_lstm_cum, 
         "EW": ew_cum,
         "BH": bh_cum,
     }
-    equity_path = "results/metrics/raw_hourly_accumalated_equity.csv"
-    save_cum_ret_to_csv(equity_dict, equity_path)
+    equity_hourly_path = "results/metrics/raw_hourly_accumalated_equity.csv"
+    save_cum_ret_to_csv(equity_hourly_dict, equity_hourly_path)
 
     return None
 
@@ -379,6 +396,7 @@ def run_train_test_hourly_raw():
 # -------------------- HOURLY / RISK-ADJUSTED -------------------- #
 
 def run_train_test_hourly_risk():
+    # 1) load prices (train/test, daily)
     train_prices = load_split_freq(split="train", freq="hourly")
     test_prices = load_split_freq(split="test", freq="hourly")
 
@@ -388,8 +406,8 @@ def run_train_test_hourly_risk():
     lambda_risk = 0.02
     vol_window = 15
 
-    # train PPO + DQN (risk-adjusted)
-    ppo_agent, dqn_agent = train_ppo_and_dqn(
+    # 2) train PPO + DQN (risk-adjusted reward)
+    ppo_agent, dqn_agent, ppo_lstm_agent = train_ppo_and_dqn(
         train_r,
         train_f,
         reward_mode="risk",
@@ -397,6 +415,7 @@ def run_train_test_hourly_risk():
         vol_window=vol_window,
     )
 
+    # 3) test envs (risk mode)
     ppo_test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -418,13 +437,18 @@ def run_train_test_hourly_risk():
 
     ppo_rets = eval_agent(ppo_agent, ppo_test_env)
     dqn_rets = eval_agent(dqn_agent, dqn_test_env)
+    ppo_lstm_rets = eval_agent(ppo_lstm_agent, ppo_test_env)
 
     idx = test_f.index[WINDOW:]
     ppo_ret = pd.Series(ppo_rets, index=idx)
     dqn_ret = pd.Series(dqn_rets, index=idx)
+    ppo_lstm_ret = pd.Series(ppo_lstm_rets, index=idx)
+
     ppo_cum = ppo_ret.cumsum()
     dqn_cum = dqn_ret.cumsum()
+    ppo_lstm_cum = ppo_lstm_ret.cumsum()
 
+    # baselines
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
@@ -432,11 +456,12 @@ def run_train_test_hourly_risk():
     print("Metrics (HOURLY, RISK-ADJUSTED reward):")
     print("  PPO_risk:", ann_metrics(ppo_ret))
     print("  DQN_risk:", ann_metrics(dqn_ret))
+    print("  PPO_LSTM_risk:", ann_metrics(ppo_lstm_ret))
     print("  EW      :", ann_metrics(ew_r))
     print("  BH      :", ann_metrics(bh_r))
 
     plot_equity(
-        {"PPO_risk": ppo_cum, "DQN_risk": dqn_cum, "EW": ew_cum, "BH": bh_cum},
+        {"PPO_risk": ppo_cum, "PPO_LSTM_risk": ppo_lstm_cum, "DQN_risk": dqn_cum, "EW": ew_cum, "BH": bh_cum},
         "results/figures/equity_hourly_risk.png",
     )
     print("Saved figure -> results/figures/equity_hourly_risk.png")
@@ -444,20 +469,22 @@ def run_train_test_hourly_risk():
     metrics_dict = {
         "PPO": ann_metrics(ppo_ret),
         "DQN": ann_metrics(dqn_ret),
+        "PPO_LSTM": ann_metrics(ppo_lstm_ret), 
         "EW": ann_metrics(ew_r),
         "BH": ann_metrics(bh_r),
     }
     metrics_path = "results/metrics/risk_hourly_metrics.csv"
     save_equity_to_csv(metrics_dict, metrics_path)
 
-    equity_dict = {
+    equity_hourly_dict = {
         "PPO": ppo_cum,
         "DQN": dqn_cum,
+        "PPO_LSTM": ppo_lstm_cum, 
         "EW": ew_cum,
         "BH": bh_cum,
     }
-    equity_path = "results/metrics/risk_hourly_accumalated_equity.csv"
-    save_cum_ret_to_csv(equity_dict, equity_path)
+    equity_hourly_path = "results/metrics/risk_hourly_accumalated_equity.csv"
+    save_cum_ret_to_csv(equity_hourly_dict, equity_hourly_path)
 
     return None
 
@@ -632,8 +659,8 @@ def run_train_test_30min_risk():
 if __name__ == "__main__":
     print(torch.backends.mps.is_available(), torch.backends.mps.is_built())
     run_train_test_daily_raw()
-    # run_train_test_daily_risk()
-    # run_train_test_hourly_raw()
-    # run_train_test_hourly_risk()
+    run_train_test_daily_risk()
+    run_train_test_hourly_raw()
+    run_train_test_hourly_risk()
     # run_train_test_30min_raw()
     # run_train_test_30min_risk()

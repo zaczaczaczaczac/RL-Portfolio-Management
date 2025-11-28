@@ -39,7 +39,7 @@ class PPO_LSTM_Agent:
         
         if "policy_kwargs" not in self.model_kwargs:
             self.model_kwargs["policy_kwargs"] = dict(
-                lstm_hidden_size=256,
+                lstm_hidden_size=128,
                 n_lstm_layers=1,
                 shared_lstm=True,
                 enable_critic_lstm=False
