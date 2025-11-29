@@ -13,9 +13,13 @@ from src.agents.dqn_agent import DQN_Agent, DQNHyperparams
 from src.agents.ppo_lstm_agent import PPO_LSTM_Agent, PPOLSTMHyperparams
 from src.evaluate import ann_metrics, plot_equity, save_equity_to_csv, save_cum_ret_to_csv
 
-WINDOW = 20
 COST_BPS = 20
-TIMESTEPS = 350_000  # adjust if needed
+
+DAILY_WINDOW = 20
+DAILY_TIMESTEPS = 400_000  # adjust if needed
+
+HOURLY_WINDOW = 48
+HOURLY_TIMESTEPS = 650_000
 
 
 # -------------------- shared helpers -------------------- #
@@ -23,7 +27,12 @@ TIMESTEPS = 350_000  # adjust if needed
 def train_ppo_and_dqn(
     train_r,
     train_f,
+    window,
+    timesteps,
     reward_mode: str,
+    ppo_hyperparam: PPOHyperparams = PPOHyperparams(), 
+    ppo_lstm_hyperparams: PPOLSTMHyperparams = PPOLSTMHyperparams(), 
+    dqn_hyperparams: DQNHyperparams = DQNHyperparams(),
     lambda_risk: float = 0.0,
     vol_window: int = 20,
 ):
@@ -38,56 +47,36 @@ def train_ppo_and_dqn(
     ppo_env = PortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
-        window=WINDOW,
+        window=window,
         cost_bps=COST_BPS,
         reward_mode=reward_mode,
         lambda_risk=lambda_risk,
         vol_window=vol_window,
     )
 
-    raw_ppo_hyperparams = PPOHyperparams(
-        policy="MlpPolicy",
-        learning_rate=4e-4,
-        n_epochs=10,
-        batch_size=32,
-        n_steps=2048,
-        gae_lambda=0.99,
-        ent_coef=0.06,
-    )
-
-    raw_ppo_lstm_hyperparams = PPOLSTMHyperparams(
-        policy="MlpLstmPolicy",
-        learning_rate=4e-4,
-        n_epochs=10,
-        batch_size=32,
-        n_steps=2048,
-        gae_lambda=0.99,
-        ent_coef=0.06,
-    )
-
 
     print(f"{reward_mode} PPO agent initiated")
-    ppo_agent = PPO_Agent(ppo_env, h_params=raw_ppo_hyperparams)
-    ppo_lstm_agent = PPO_LSTM_Agent(ppo_env, raw_ppo_lstm_hyperparams)
-    ppo_agent.learn(timesteps=TIMESTEPS, pbar=True)
-    ppo_lstm_agent.learn(timesteps=TIMESTEPS, pbar=True)
+    ppo_agent = PPO_Agent(ppo_env, h_params=ppo_hyperparam)
+    ppo_lstm_agent = PPO_LSTM_Agent(ppo_env, h_params=ppo_lstm_hyperparams)
+    ppo_agent.learn(timesteps=timesteps, pbar=True)
+    ppo_lstm_agent.learn(timesteps=timesteps, pbar=True)
 
 
     # ----- DQN env (discrete actions) -----
     dqn_env = DiscretePortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
-        window=WINDOW,
+        window=window,
         cost_bps=COST_BPS,
         reward_mode=reward_mode,
         lambda_risk=lambda_risk,
         vol_window=vol_window,
     )
 
-    dqn_hparams = DQNHyperparams()  # use your defaults
+    # dqn_hparams = DQNHyperparams()  # use your defaults
     print(f"{reward_mode} DQN agent initiated")
-    dqn_agent = DQN_Agent(dqn_env, h_params=dqn_hparams)
-    dqn_agent.learn(timesteps=TIMESTEPS, pbar=True)
+    dqn_agent = DQN_Agent(dqn_env, h_params=dqn_hyperparams)
+    dqn_agent.learn(timesteps=timesteps, pbar=True)
 
     return ppo_agent, dqn_agent, ppo_lstm_agent
 
@@ -114,21 +103,47 @@ def run_train_test_daily_raw():
 
     # 2) log returns + features
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
-    train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
+    train_f, test_f = build_features(train_r, DAILY_WINDOW), build_features(test_r, DAILY_WINDOW)
+
+    # external hyperparameter declaration
+    raw_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=3e-4,
+        n_epochs=10,
+        batch_size=32,
+        n_steps=2048,
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
+
+    raw_ppo_lstm_hyperparams = PPOLSTMHyperparams(
+        policy="MlpLstmPolicy",
+        learning_rate=2e-4,
+        n_epochs=10,
+        batch_size=128,
+        n_steps=1024,
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
 
     # 3) train PPO + DQN (raw reward)
     ppo_agent, dqn_agent, ppo_lstm_agent = train_ppo_and_dqn(
         train_r,
         train_f,
+        window=DAILY_WINDOW, 
+        timesteps=DAILY_TIMESTEPS,
         reward_mode="raw",
         lambda_risk=0.0,
+        ppo_hyperparam=raw_ppo_hyperparams,
+        ppo_lstm_hyperparams=raw_ppo_lstm_hyperparams,
+        dqn_hyperparams=DQNHyperparams()
     )
 
     # 4) test envs (raw reward)
     ppo_test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=DAILY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="raw",
         lambda_risk=0.0,
@@ -136,7 +151,7 @@ def run_train_test_daily_raw():
     dqn_test_env = DiscretePortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=DAILY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="raw",
         lambda_risk=0.0,
@@ -147,7 +162,7 @@ def run_train_test_daily_raw():
     ppo_lstm_rets = eval_agent(ppo_lstm_agent, ppo_test_env)
 
     # align with dates: drop first WINDOW steps
-    idx = test_f.index[WINDOW:]
+    idx = test_f.index[DAILY_WINDOW:]
     ppo_ret = pd.Series(ppo_rets, index=idx)
     dqn_ret = pd.Series(dqn_rets, index=idx)
     ppo_lstm_ret = pd.Series(ppo_lstm_rets, index=idx)
@@ -157,7 +172,7 @@ def run_train_test_daily_raw():
     ppo_lstm_cum = ppo_lstm_ret.cumsum()
 
     # baselines on the same period
-    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
+    test_slice = test_r.loc[test_f.index].iloc[DAILY_WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
 
@@ -209,25 +224,53 @@ def run_train_test_daily_risk():
     test_prices = load_split_freq(split="test", freq="daily")
 
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
-    train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
+    train_f, test_f = build_features(train_r, DAILY_WINDOW), build_features(test_r, DAILY_WINDOW)
 
-    lambda_risk = 0.02
-    vol_window = 10
+    lambda_risk = 0.015
+    vol_window = 15
 
-    # 2) train PPO + DQN (risk-adjusted reward)
+    # external hyperparameter declaration
+    risk_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=4e-4,
+        n_epochs=13,
+        batch_size=256,
+        n_steps=2048,
+        gamma=0.85, 
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
+
+    risk_ppo_lstm_hyperparams = PPOLSTMHyperparams(
+        policy="MlpLstmPolicy",
+        learning_rate=2e-4,
+        n_epochs=13,
+        batch_size=256,
+        n_steps=2048,
+        gamma=0.85, 
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
+
+    # 3) train PPO + DQN (raw reward)
     ppo_agent, dqn_agent, ppo_lstm_agent = train_ppo_and_dqn(
         train_r,
         train_f,
+        window=DAILY_WINDOW, 
+        timesteps=DAILY_TIMESTEPS,
         reward_mode="risk",
         lambda_risk=lambda_risk,
         vol_window=vol_window,
+        ppo_hyperparam=risk_ppo_hyperparams,
+        ppo_lstm_hyperparams=risk_ppo_lstm_hyperparams,
+        dqn_hyperparams=DQNHyperparams()
     )
 
     # 3) test envs (risk mode)
     ppo_test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=DAILY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",
         lambda_risk=lambda_risk,
@@ -236,7 +279,7 @@ def run_train_test_daily_risk():
     dqn_test_env = DiscretePortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=DAILY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",
         lambda_risk=lambda_risk,
@@ -247,7 +290,7 @@ def run_train_test_daily_risk():
     dqn_rets = eval_agent(dqn_agent, dqn_test_env)
     ppo_lstm_rets = eval_agent(ppo_lstm_agent, ppo_test_env)
 
-    idx = test_f.index[WINDOW:]
+    idx = test_f.index[DAILY_WINDOW:]
     ppo_ret = pd.Series(ppo_rets, index=idx)
     dqn_ret = pd.Series(dqn_rets, index=idx)
     ppo_lstm_ret = pd.Series(ppo_lstm_rets, index=idx)
@@ -257,7 +300,7 @@ def run_train_test_daily_risk():
     ppo_lstm_cum = ppo_lstm_ret.cumsum()
 
     # baselines
-    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
+    test_slice = test_r.loc[test_f.index].iloc[DAILY_WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
 
@@ -306,21 +349,48 @@ def run_train_test_hourly_raw():
 
     # 2) log returns + features
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
-    train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
+    train_f, test_f = build_features(train_r, HOURLY_WINDOW), build_features(test_r, HOURLY_WINDOW)
+
+    raw_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=3e-4,
+        n_epochs=10,
+        batch_size=512,
+        n_steps=4096,
+        gamma=0.9, 
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
+
+    raw_ppo_lstm_hyperparams = PPOLSTMHyperparams(
+        policy="MlpLstmPolicy",
+        learning_rate=2e-4,
+        n_epochs=10,
+        batch_size=256,
+        n_steps=2048,
+        gamma=0.9, 
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
 
     # 3) train PPO + DQN (raw reward)
     ppo_agent, dqn_agent, ppo_lstm_agent = train_ppo_and_dqn(
         train_r,
         train_f,
+        window=HOURLY_WINDOW, 
+        timesteps=HOURLY_TIMESTEPS, 
         reward_mode="raw",
         lambda_risk=0.0,
+        ppo_hyperparam=raw_ppo_hyperparams, 
+        ppo_lstm_hyperparams=raw_ppo_lstm_hyperparams, 
+        dqn_hyperparams=DQNHyperparams()
     )
 
     # 4) test envs (raw reward)
     ppo_test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=HOURLY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="raw",
         lambda_risk=0.0,
@@ -328,7 +398,7 @@ def run_train_test_hourly_raw():
     dqn_test_env = DiscretePortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=HOURLY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="raw",
         lambda_risk=0.0,
@@ -339,7 +409,7 @@ def run_train_test_hourly_raw():
     ppo_lstm_rets = eval_agent(ppo_lstm_agent, ppo_test_env)
 
     # align with dates: drop first WINDOW steps
-    idx = test_f.index[WINDOW:]
+    idx = test_f.index[HOURLY_WINDOW:]
     ppo_ret = pd.Series(ppo_rets, index=idx)
     dqn_ret = pd.Series(dqn_rets, index=idx)
     ppo_lstm_ret = pd.Series(ppo_lstm_rets, index=idx)
@@ -349,7 +419,7 @@ def run_train_test_hourly_raw():
     ppo_lstm_cum = ppo_lstm_ret.cumsum()
 
     # baselines on the same period
-    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
+    test_slice = test_r.loc[test_f.index].iloc[HOURLY_WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
 
@@ -401,25 +471,53 @@ def run_train_test_hourly_risk():
     test_prices = load_split_freq(split="test", freq="hourly")
 
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
-    train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
+    train_f, test_f = build_features(train_r, HOURLY_WINDOW), build_features(test_r, HOURLY_WINDOW)
 
     lambda_risk = 0.02
     vol_window = 15
 
-    # 2) train PPO + DQN (risk-adjusted reward)
+    # external hyperparameter declaration
+    risk_ppo_hyperparams = PPOHyperparams(
+        policy="MlpPolicy",
+        learning_rate=3e-4,
+        n_epochs=10,
+        batch_size=512,
+        n_steps=4096,
+        gamma=0.85,
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
+
+    risk_ppo_lstm_hyperparams = PPOLSTMHyperparams(
+        policy="MlpLstmPolicy",
+        learning_rate=2e-4,
+        n_epochs=10,
+        batch_size=256,
+        n_steps=1024,
+        gamma=0.85, 
+        gae_lambda=0.95,
+        ent_coef=0.01,
+    )
+
+    # 3) train PPO + DQN (raw reward)
     ppo_agent, dqn_agent, ppo_lstm_agent = train_ppo_and_dqn(
         train_r,
         train_f,
+        window=HOURLY_WINDOW, 
+        timesteps=HOURLY_TIMESTEPS,
         reward_mode="risk",
         lambda_risk=lambda_risk,
         vol_window=vol_window,
+        ppo_hyperparam=risk_ppo_hyperparams,
+        ppo_lstm_hyperparams=risk_ppo_lstm_hyperparams,
+        dqn_hyperparams=DQNHyperparams()
     )
 
     # 3) test envs (risk mode)
     ppo_test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=HOURLY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",
         lambda_risk=lambda_risk,
@@ -428,7 +526,7 @@ def run_train_test_hourly_risk():
     dqn_test_env = DiscretePortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
-        window=WINDOW,
+        window=HOURLY_WINDOW,
         cost_bps=COST_BPS,
         reward_mode="risk",
         lambda_risk=lambda_risk,
@@ -439,7 +537,7 @@ def run_train_test_hourly_risk():
     dqn_rets = eval_agent(dqn_agent, dqn_test_env)
     ppo_lstm_rets = eval_agent(ppo_lstm_agent, ppo_test_env)
 
-    idx = test_f.index[WINDOW:]
+    idx = test_f.index[HOURLY_WINDOW:]
     ppo_ret = pd.Series(ppo_rets, index=idx)
     dqn_ret = pd.Series(dqn_rets, index=idx)
     ppo_lstm_ret = pd.Series(ppo_lstm_rets, index=idx)
@@ -449,7 +547,7 @@ def run_train_test_hourly_risk():
     ppo_lstm_cum = ppo_lstm_ret.cumsum()
 
     # baselines
-    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
+    test_slice = test_r.loc[test_f.index].iloc[HOURLY_WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
 
@@ -660,7 +758,7 @@ if __name__ == "__main__":
     print(torch.backends.mps.is_available(), torch.backends.mps.is_built())
     run_train_test_daily_raw()
     run_train_test_daily_risk()
-    run_train_test_hourly_raw()
-    run_train_test_hourly_risk()
+    # run_train_test_hourly_raw() # TEMP DONE
+    # run_train_test_hourly_risk()
     # run_train_test_30min_raw()
     # run_train_test_30min_risk()
