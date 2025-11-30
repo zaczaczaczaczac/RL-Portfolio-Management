@@ -110,7 +110,7 @@ def run_train_test_daily_raw():
         policy="MlpPolicy",
         learning_rate=3e-4,
         n_epochs=10,
-        batch_size=32,
+        batch_size=256,
         n_steps=2048,
         gae_lambda=0.95,
         ent_coef=0.01,
@@ -118,10 +118,10 @@ def run_train_test_daily_raw():
 
     raw_ppo_lstm_hyperparams = PPOLSTMHyperparams(
         policy="MlpLstmPolicy",
-        learning_rate=2e-4,
+        learning_rate=3e-4,
         n_epochs=10,
-        batch_size=128,
-        n_steps=1024,
+        batch_size=256,
+        n_steps=2048,
         gae_lambda=0.95,
         ent_coef=0.01,
     )
@@ -226,15 +226,15 @@ def run_train_test_daily_risk():
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, DAILY_WINDOW), build_features(test_r, DAILY_WINDOW)
 
-    lambda_risk = 0.015
+    lambda_risk = 0.01
     vol_window = 15
 
     # external hyperparameter declaration
     risk_ppo_hyperparams = PPOHyperparams(
         policy="MlpPolicy",
-        learning_rate=4e-4,
-        n_epochs=13,
-        batch_size=256,
+        learning_rate=3e-4,
+        n_epochs=10,
+        batch_size=512,
         n_steps=2048,
         gamma=0.85, 
         gae_lambda=0.95,
@@ -243,9 +243,9 @@ def run_train_test_daily_risk():
 
     risk_ppo_lstm_hyperparams = PPOLSTMHyperparams(
         policy="MlpLstmPolicy",
-        learning_rate=2e-4,
-        n_epochs=13,
-        batch_size=256,
+        learning_rate=3e-4,
+        n_epochs=10,
+        batch_size=512,
         n_steps=2048,
         gamma=0.85, 
         gae_lambda=0.95,
@@ -473,16 +473,16 @@ def run_train_test_hourly_risk():
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, HOURLY_WINDOW), build_features(test_r, HOURLY_WINDOW)
 
-    lambda_risk = 0.02
-    vol_window = 15
+    lambda_risk = 0.01
+    vol_window = 40
 
     # external hyperparameter declaration
     risk_ppo_hyperparams = PPOHyperparams(
         policy="MlpPolicy",
         learning_rate=3e-4,
         n_epochs=10,
-        batch_size=512,
-        n_steps=4096,
+        batch_size=64,
+        n_steps=2048,
         gamma=0.85,
         gae_lambda=0.95,
         ent_coef=0.01,
@@ -492,8 +492,8 @@ def run_train_test_hourly_risk():
         policy="MlpLstmPolicy",
         learning_rate=2e-4,
         n_epochs=10,
-        batch_size=256,
-        n_steps=1024,
+        batch_size=64,
+        n_steps=2048,
         gamma=0.85, 
         gae_lambda=0.95,
         ent_coef=0.01,
@@ -756,9 +756,9 @@ def run_train_test_30min_risk():
 
 if __name__ == "__main__":
     print(torch.backends.mps.is_available(), torch.backends.mps.is_built())
-    run_train_test_daily_raw()
-    run_train_test_daily_risk()
+    # run_train_test_daily_raw()
+    # run_train_test_daily_risk()
     # run_train_test_hourly_raw() # TEMP DONE
-    # run_train_test_hourly_risk()
+    run_train_test_hourly_risk()
     # run_train_test_30min_raw()
     # run_train_test_30min_risk()
