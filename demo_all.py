@@ -479,24 +479,33 @@ def run_train_test_hourly_risk():
     # external hyperparameter declaration
     risk_ppo_hyperparams = PPOHyperparams(
         policy="MlpPolicy",
-        learning_rate=3e-4,
+        learning_rate=1e-4,   # was 3e-4 → slightly slower, more stable
         n_epochs=10,
-        batch_size=64,
-        n_steps=2048,
-        gamma=0.85,
+        batch_size=512,       # was 64 → smoother gradients
+        n_steps=4096,         # was 2048 → longer rollouts for hourly data
+        gamma=0.995,          # was 0.85 → horizon ~200 hours ≈ 8 trading days
         gae_lambda=0.95,
-        ent_coef=0.01,
+        clip_range=0.2,
+        ent_coef=0.005,       # was 0.01 → a bit less random, enough exploration
+        vf_coef=0.5,
+        max_grad_norm=0.5,
+        verbose=0,
     )
+
 
     risk_ppo_lstm_hyperparams = PPOLSTMHyperparams(
         policy="MlpLstmPolicy",
-        learning_rate=2e-4,
+        learning_rate=1e-4,   # was 2e-4 → calm down updates
         n_epochs=10,
-        batch_size=64,
-        n_steps=2048,
-        gamma=0.85, 
+        batch_size=512,       # was 64 → more stable gradients, <= n_steps
+        n_steps=4096,         # keep sequences shorter than PPO MLP
+        gamma=0.995,          # same long horizon as PPO
         gae_lambda=0.95,
-        ent_coef=0.01,
+        clip_range=0.2,
+        ent_coef=0.01,        # keep a bit higher exploration for LSTM
+        vf_coef=0.5,
+        max_grad_norm=0.5,
+        verbose=0,
     )
 
     # 3) train PPO + DQN (raw reward)
