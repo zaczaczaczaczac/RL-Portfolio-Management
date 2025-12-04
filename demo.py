@@ -11,19 +11,16 @@ from src.evaluate import ann_metrics, plot_equity, save_equity_to_csv, save_cum_
 
 WINDOW = 20
 COST_BPS = 20
-TIMESTEPS = 350_000  # 先跑个小步数，确认流程
+TIMESTEPS = 350_000  
 
 # daily
 def run_train_test_daily_raw():
-    # 1) 读价格（train/test, daily）
     train_prices = load_split_freq(split="train", freq="daily")
     test_prices  = load_split_freq(split="test",  freq="daily")
 
-    # 2) 转对数收益 + 构建最小特征
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # 3) 训练 PPO（raw reward）
     env = PortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
@@ -50,7 +47,6 @@ def run_train_test_daily_raw():
     raw_PPO_agent = PPO_Agent(env, h_params=raw_ppo_hyperparams)
     raw_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
-    # 4) 测试回测（raw reward）
     test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -66,11 +62,10 @@ def run_train_test_daily_raw():
         obs, r, done, _, _ = test_env.step(action)
         rets.append(r)
 
-    idx = test_f.index[WINDOW:]          # 对齐 reward 长度
+    idx = test_f.index[WINDOW:]          
     rl_ret = pd.Series(rets, index=idx)
     rl_cum = rl_ret.cumsum()
 
-    # baselines 也用同一时段对齐
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
@@ -106,21 +101,19 @@ def run_train_test_daily_raw():
     return None
 
 def run_train_test_daily_risk():
-    # 1) 读价格（与 raw 相同）
     train_prices = load_split_freq(split="train", freq="daily")
     test_prices  = load_split_freq(split="test",  freq="daily")
 
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # 2) 训练 PPO（risk-adjusted reward）
     env = PortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
         window=WINDOW,
         cost_bps=COST_BPS,
-        reward_mode="risk",     # ✅ 使用 risk 模式
-        lambda_risk=0.02,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
+        reward_mode="risk",    
+        lambda_risk=0.02,       
         vol_window=15,
     )
     # model = PPO("MlpPolicy", env, verbose=0)
@@ -139,7 +132,6 @@ def run_train_test_daily_risk():
     risk_PPO_agent = PPO_Agent(env, h_params=risk_ppo_hyperparams)
     risk_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
-    # 3) 测试回测（risk 模式）
     test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -160,7 +152,6 @@ def run_train_test_daily_risk():
     rl_ret = pd.Series(rets, index=idx)
     rl_cum = rl_ret.cumsum()
 
-    # baselines 同样区间
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
@@ -198,11 +189,9 @@ def run_train_test_hourly_raw():
     train_prices = load_split_freq(split="train", freq="hourly")
     test_prices  = load_split_freq(split="test",  freq="hourly")
 
-    # 2) 转对数收益 + 构建最小特征
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # 3) 训练 PPO（raw reward）
     env = PortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
@@ -229,7 +218,6 @@ def run_train_test_hourly_raw():
     raw_PPO_agent = PPO_Agent(env, h_params=raw_ppo_hyperparams)
     raw_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
-    # 4) 测试回测（raw reward）
     test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -245,11 +233,10 @@ def run_train_test_hourly_raw():
         obs, r, done, _, _ = test_env.step(action)
         rets.append(r)
 
-    idx = test_f.index[WINDOW:]          # 对齐 reward 长度
+    idx = test_f.index[WINDOW:]       
     rl_ret = pd.Series(rets, index=idx)
     rl_cum = rl_ret.cumsum()
 
-    # baselines 也用同一时段对齐
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
@@ -285,21 +272,19 @@ def run_train_test_hourly_raw():
     return None
 
 def run_train_test_hourly_risk():
-    # 1) 读价格（与 raw 相同）
     train_prices = load_split_freq(split="train", freq="hourly")
     test_prices  = load_split_freq(split="test",  freq="hourly")
 
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # 2) 训练 PPO（risk-adjusted reward）
     env = PortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
         window=WINDOW,
         cost_bps=COST_BPS,
-        reward_mode="risk",     # ✅ 使用 risk 模式
-        lambda_risk=0.02,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
+        reward_mode="risk",    
+        lambda_risk=0.02,       
         vol_window=15,
     )
     # model = PPO("MlpPolicy", env, verbose=0)
@@ -318,7 +303,6 @@ def run_train_test_hourly_risk():
     risk_PPO_agent = PPO_Agent(env, h_params=risk_ppo_hyperparams)
     risk_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
-    # 3) 测试回测（risk 模式）
     test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -339,7 +323,6 @@ def run_train_test_hourly_risk():
     rl_ret = pd.Series(rets, index=idx)
     rl_cum = rl_ret.cumsum()
 
-    # baselines 同样区间
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
@@ -377,11 +360,9 @@ def run_train_test_30min_raw():
     train_prices = load_split_freq(split="train", freq="30min")
     test_prices  = load_split_freq(split="test",  freq="30min")
 
-    # 2) 转对数收益 + 构建最小特征
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # 3) 训练 PPO（raw reward）
     env = PortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
@@ -408,7 +389,6 @@ def run_train_test_30min_raw():
     raw_PPO_agent = PPO_Agent(env, h_params=raw_ppo_hyperparams)
     raw_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
-    # 4) 测试回测（raw reward）
     test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -424,11 +404,10 @@ def run_train_test_30min_raw():
         obs, r, done, _, _ = test_env.step(action)
         rets.append(r)
 
-    idx = test_f.index[WINDOW:]          # 对齐 reward 长度
+    idx = test_f.index[WINDOW:]         
     rl_ret = pd.Series(rets, index=idx)
     rl_cum = rl_ret.cumsum()
 
-    # baselines 也用同一时段对齐
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)
@@ -464,21 +443,19 @@ def run_train_test_30min_raw():
     return None
 
 def run_train_test_30min_risk():
-    # 1) 读价格（与 raw 相同）
     train_prices = load_split_freq(split="train", freq="30min")
     test_prices  = load_split_freq(split="test",  freq="30min")
 
     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # 2) 训练 PPO（risk-adjusted reward）
     env = PortfolioEnv(
         train_r.loc[train_f.index],
         train_f,
         window=WINDOW,
         cost_bps=COST_BPS,
-        reward_mode="risk",     # ✅ 使用 risk 模式
-        lambda_risk=0.02,        # 可以之后调参数，比如 2.0, 5.0, 10.0 做消融
+        reward_mode="risk",    
+        lambda_risk=0.02,      
         vol_window=15,
     )
     # model = PPO("MlpPolicy", env, verbose=0)
@@ -497,7 +474,6 @@ def run_train_test_30min_risk():
     risk_PPO_agent = PPO_Agent(env, h_params=risk_ppo_hyperparams)
     risk_PPO_agent.learn(timesteps=TIMESTEPS, pbar=True)
 
-    # 3) 测试回测（risk 模式）
     test_env = PortfolioEnv(
         test_r.loc[test_f.index],
         test_f,
@@ -518,7 +494,6 @@ def run_train_test_30min_risk():
     rl_ret = pd.Series(rets, index=idx)
     rl_cum = rl_ret.cumsum()
 
-    # baselines 同样区间
     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
     ew_r, ew_cum = equal_weight(test_slice, freq='M', cost_bps=20)
     bh_r, bh_cum = buy_and_hold(test_slice)

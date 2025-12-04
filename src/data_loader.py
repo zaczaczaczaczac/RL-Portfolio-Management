@@ -16,7 +16,7 @@ def _detect_price_col(df: pd.DataFrame) -> str:
     for c in PRICE_COL_ORDER:
         if c in df.columns:
             return c
-    # 兜底：如果只有一个非日期列，就用它
+    
     non_date_cols = [c for c in df.columns if c not in DATE_COL_CANDIDATES]
     if len(non_date_cols) == 1:
         return non_date_cols[0]
@@ -27,7 +27,7 @@ def _ticker_from_filename(path: str) -> str:
     return base.split("_")[0].upper()
 
 def _strip_tz(idx: pd.DatetimeIndex) -> pd.DatetimeIndex:
-    """把带时区/混合时区索引统一成 naive 时间（UTC→naive）。"""
+    """convert from UTC timezone to naive (UTC→naive)"""
     if getattr(idx, "tz", None) is not None:
         return idx.tz_convert("UTC").tz_localize(None)
     return idx
@@ -43,8 +43,8 @@ def _read_one_csv(path: str) -> pd.Series:
     df = df.dropna(subset=[dcol]).sort_values(dcol).set_index(dcol)
 
     s = df[pcol].astype("float64")
-    s.index = _strip_tz(s.index)              # 去掉时区，统一成 naive datetime
-    s = s[~s.index.duplicated(keep="first")]  # 去重
+    s.index = _strip_tz(s.index)              
+    s = s[~s.index.duplicated(keep="first")]  
     s.name = _ticker_from_filename(path)
     return s
 
@@ -54,7 +54,7 @@ def load_folder_to_prices(folder: str) -> pd.DataFrame:
         raise FileNotFoundError(f"No CSV in: {folder}")
     series_list = [_read_one_csv(f) for f in files]
     prices = pd.concat(series_list, axis=1).dropna(how="any").sort_index()
-    prices = prices.reindex(sorted(prices.columns), axis=1)  # 固定列顺序
+    prices = prices.reindex(sorted(prices.columns), axis=1)  # fix temporal series ordering
     return prices
 
 def load_split_freq(root="data", split="train", freq="daily") -> pd.DataFrame:
