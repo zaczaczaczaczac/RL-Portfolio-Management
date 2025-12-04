@@ -595,179 +595,180 @@ def run_train_test_hourly_risk():
 
     return None
 
+
+#  30 min interval training and testing ignored
+
 # -------------------- 30min / RAW -------------------- #
 
-def run_train_test_30min_raw():
-    train_prices = load_split_freq(split="train", freq="30min")
-    test_prices = load_split_freq(split="test", freq="30min")
+# def run_train_test_30min_raw():
+#     train_prices = load_split_freq(split="train", freq="30min")
+#     test_prices = load_split_freq(split="test", freq="30min")
 
-    train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
-    train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
+#     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
+#     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    # train PPO + DQN (raw reward)
-    ppo_agent, dqn_agent = train_ppo_and_dqn(
-        train_r,
-        train_f,
-        reward_mode="raw",
-        lambda_risk=0.0,
-    )
+#     # train PPO + DQN (raw reward)
+#     ppo_agent, dqn_agent = train_ppo_and_dqn(
+#         train_r,
+#         train_f,
+#         reward_mode="raw",
+#         lambda_risk=0.0,
+#     )
 
-    # test envs
-    ppo_test_env = PortfolioEnv(
-        test_r.loc[test_f.index],
-        test_f,
-        window=WINDOW,
-        cost_bps=COST_BPS,
-        reward_mode="raw",
-        lambda_risk=0.0,
-    )
-    dqn_test_env = DiscretePortfolioEnv(
-        test_r.loc[test_f.index],
-        test_f,
-        window=WINDOW,
-        cost_bps=COST_BPS,
-        reward_mode="raw",
-        lambda_risk=0.0,
-    )
+#     # test envs
+#     ppo_test_env = PortfolioEnv(
+#         test_r.loc[test_f.index],
+#         test_f,
+#         window=WINDOW,
+#         cost_bps=COST_BPS,
+#         reward_mode="raw",
+#         lambda_risk=0.0,
+#     )
+#     dqn_test_env = DiscretePortfolioEnv(
+#         test_r.loc[test_f.index],
+#         test_f,
+#         window=WINDOW,
+#         cost_bps=COST_BPS,
+#         reward_mode="raw",
+#         lambda_risk=0.0,
+#     )
 
-    ppo_rets = eval_agent(ppo_agent, ppo_test_env)
-    dqn_rets = eval_agent(dqn_agent, dqn_test_env)
+#     ppo_rets = eval_agent(ppo_agent, ppo_test_env)
+#     dqn_rets = eval_agent(dqn_agent, dqn_test_env)
 
-    idx = test_f.index[WINDOW:]
-    ppo_ret = pd.Series(ppo_rets, index=idx)
-    dqn_ret = pd.Series(dqn_rets, index=idx)
-    ppo_cum = ppo_ret.cumsum()
-    dqn_cum = dqn_ret.cumsum()
+#     idx = test_f.index[WINDOW:]
+#     ppo_ret = pd.Series(ppo_rets, index=idx)
+#     dqn_ret = pd.Series(dqn_rets, index=idx)
+#     ppo_cum = ppo_ret.cumsum()
+#     dqn_cum = dqn_ret.cumsum()
 
-    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
-    ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
-    bh_r, bh_cum = buy_and_hold(test_slice)
+#     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
+#     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
+#     bh_r, bh_cum = buy_and_hold(test_slice)
 
-    print("Metrics (30min, RAW reward):")
-    print("  PPO:", ann_metrics(ppo_ret))
-    print("  DQN:", ann_metrics(dqn_ret))
-    print("  EW :", ann_metrics(ew_r))
-    print("  BH :", ann_metrics(bh_r))
+#     print("Metrics (30min, RAW reward):")
+#     print("  PPO:", ann_metrics(ppo_ret))
+#     print("  DQN:", ann_metrics(dqn_ret))
+#     print("  EW :", ann_metrics(ew_r))
+#     print("  BH :", ann_metrics(bh_r))
 
-    plot_equity(
-        {"PPO_raw": ppo_cum, "DQN_raw": dqn_cum, "EW": ew_cum, "BH": bh_cum},
-        "results/figures/equity_30min_raw.png",
-    )
-    print("Saved figure -> results/figures/equity_30min_raw.png")
+#     plot_equity(
+#         {"PPO_raw": ppo_cum, "DQN_raw": dqn_cum, "EW": ew_cum, "BH": bh_cum},
+#         "results/figures/equity_30min_raw.png",
+#     )
+#     print("Saved figure -> results/figures/equity_30min_raw.png")
 
-    metrics_dict = {
-        "PPO": ann_metrics(ppo_ret),
-        "DQN": ann_metrics(dqn_ret),
-        "EW": ann_metrics(ew_r),
-        "BH": ann_metrics(bh_r),
-    }
-    metrics_path = "results/metrics/raw_30min_metrics.csv"
-    save_equity_to_csv(metrics_dict, metrics_path)
+#     metrics_dict = {
+#         "PPO": ann_metrics(ppo_ret),
+#         "DQN": ann_metrics(dqn_ret),
+#         "EW": ann_metrics(ew_r),
+#         "BH": ann_metrics(bh_r),
+#     }
+#     metrics_path = "results/metrics/raw_30min_metrics.csv"
+#     save_equity_to_csv(metrics_dict, metrics_path)
 
-    equity_dict = {
-        "PPO": ppo_cum,
-        "DQN": dqn_cum,
-        "EW": ew_cum,
-        "BH": bh_cum,
-    }
-    equity_path = "results/metrics/raw_30min_accumalated_equity.csv"
-    save_cum_ret_to_csv(equity_dict, equity_path)
+#     equity_dict = {
+#         "PPO": ppo_cum,
+#         "DQN": dqn_cum,
+#         "EW": ew_cum,
+#         "BH": bh_cum,
+#     }
+#     equity_path = "results/metrics/raw_30min_accumalated_equity.csv"
+#     save_cum_ret_to_csv(equity_dict, equity_path)
 
-    return None
+#     return None
 
 
-# -------------------- 30min / RISK-ADJUSTED -------------------- #
+# # -------------------- 30min / RISK-ADJUSTED -------------------- #
 
-def run_train_test_30min_risk():
-    train_prices = load_split_freq(split="train", freq="30min")
-    test_prices = load_split_freq(split="test", freq="30min")
+# def run_train_test_30min_risk():
+#     train_prices = load_split_freq(split="train", freq="30min")
+#     test_prices = load_split_freq(split="test", freq="30min")
 
-    train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
-    train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
+#     train_r, test_r = to_log_returns(train_prices), to_log_returns(test_prices)
+#     train_f, test_f = build_features(train_r, WINDOW), build_features(test_r, WINDOW)
 
-    lambda_risk = 0.02
-    vol_window = 60
+#     lambda_risk = 0.02
+#     vol_window = 60
 
-    # train PPO + DQN (risk-adjusted)
-    ppo_agent, dqn_agent = train_ppo_and_dqn(
-        train_r,
-        train_f,
-        reward_mode="risk",
-        lambda_risk=lambda_risk,
-        vol_window=vol_window,
-    )
+#     # train PPO + DQN (risk-adjusted)
+#     ppo_agent, dqn_agent = train_ppo_and_dqn(
+#         train_r,
+#         train_f,
+#         reward_mode="risk",
+#         lambda_risk=lambda_risk,
+#         vol_window=vol_window,
+#     )
 
-    ppo_test_env = PortfolioEnv(
-        test_r.loc[test_f.index],
-        test_f,
-        window=WINDOW,
-        cost_bps=COST_BPS,
-        reward_mode="risk",
-        lambda_risk=lambda_risk,
-        vol_window=vol_window,
-    )
-    dqn_test_env = DiscretePortfolioEnv(
-        test_r.loc[test_f.index],
-        test_f,
-        window=WINDOW,
-        cost_bps=COST_BPS,
-        reward_mode="risk",
-        lambda_risk=lambda_risk,
-        vol_window=vol_window,
-    )
+#     ppo_test_env = PortfolioEnv(
+#         test_r.loc[test_f.index],
+#         test_f,
+#         window=WINDOW,
+#         cost_bps=COST_BPS,
+#         reward_mode="risk",
+#         lambda_risk=lambda_risk,
+#         vol_window=vol_window,
+#     )
+#     dqn_test_env = DiscretePortfolioEnv(
+#         test_r.loc[test_f.index],
+#         test_f,
+#         window=WINDOW,
+#         cost_bps=COST_BPS,
+#         reward_mode="risk",
+#         lambda_risk=lambda_risk,
+#         vol_window=vol_window,
+#     )
 
-    ppo_rets = eval_agent(ppo_agent, ppo_test_env)
-    dqn_rets = eval_agent(dqn_agent, dqn_test_env)
+#     ppo_rets = eval_agent(ppo_agent, ppo_test_env)
+#     dqn_rets = eval_agent(dqn_agent, dqn_test_env)
 
-    idx = test_f.index[WINDOW:]
-    ppo_ret = pd.Series(ppo_rets, index=idx)
-    dqn_ret = pd.Series(dqn_rets, index=idx)
-    ppo_cum = ppo_ret.cumsum()
-    dqn_cum = dqn_ret.cumsum()
+#     idx = test_f.index[WINDOW:]
+#     ppo_ret = pd.Series(ppo_rets, index=idx)
+#     dqn_ret = pd.Series(dqn_rets, index=idx)
+#     ppo_cum = ppo_ret.cumsum()
+#     dqn_cum = dqn_ret.cumsum()
 
-    test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
-    ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
-    bh_r, bh_cum = buy_and_hold(test_slice)
+#     test_slice = test_r.loc[test_f.index].iloc[WINDOW:]
+#     ew_r, ew_cum = equal_weight(test_slice, freq="M", cost_bps=20)
+#     bh_r, bh_cum = buy_and_hold(test_slice)
 
-    print("Metrics (30min, RISK-ADJUSTED reward):")
-    print("  PPO_risk:", ann_metrics(ppo_ret))
-    print("  DQN_risk:", ann_metrics(dqn_ret))
-    print("  EW      :", ann_metrics(ew_r))
-    print("  BH      :", ann_metrics(bh_r))
+#     print("Metrics (30min, RISK-ADJUSTED reward):")
+#     print("  PPO_risk:", ann_metrics(ppo_ret))
+#     print("  DQN_risk:", ann_metrics(dqn_ret))
+#     print("  EW      :", ann_metrics(ew_r))
+#     print("  BH      :", ann_metrics(bh_r))
 
-    plot_equity(
-        {"PPO_risk": ppo_cum, "DQN_risk": dqn_cum, "EW": ew_cum, "BH": bh_cum},
-        "results/figures/equity_30min_risk.png",
-    )
-    print("Saved figure -> results/figures/equity_30min_risk.png")
+#     plot_equity(
+#         {"PPO_risk": ppo_cum, "DQN_risk": dqn_cum, "EW": ew_cum, "BH": bh_cum},
+#         "results/figures/equity_30min_risk.png",
+#     )
+#     print("Saved figure -> results/figures/equity_30min_risk.png")
 
-    metrics_dict = {
-        "PPO": ann_metrics(ppo_ret),
-        "DQN": ann_metrics(dqn_ret),
-        "EW": ann_metrics(ew_r),
-        "BH": ann_metrics(bh_r),
-    }
-    metrics_path = "results/metrics/risk_30min_metrics.csv"
-    save_equity_to_csv(metrics_dict, metrics_path)
+#     metrics_dict = {
+#         "PPO": ann_metrics(ppo_ret),
+#         "DQN": ann_metrics(dqn_ret),
+#         "EW": ann_metrics(ew_r),
+#         "BH": ann_metrics(bh_r),
+#     }
+#     metrics_path = "results/metrics/risk_30min_metrics.csv"
+#     save_equity_to_csv(metrics_dict, metrics_path)
 
-    equity_dict = {
-        "PPO": ppo_cum,
-        "DQN": dqn_cum,
-        "EW": ew_cum,
-        "BH": bh_cum,
-    }
-    equity_path = "results/metrics/risk_30min_accumalated_equity.csv"
-    save_cum_ret_to_csv(equity_dict, equity_path)
+#     equity_dict = {
+#         "PPO": ppo_cum,
+#         "DQN": dqn_cum,
+#         "EW": ew_cum,
+#         "BH": bh_cum,
+#     }
+#     equity_path = "results/metrics/risk_30min_accumalated_equity.csv"
+#     save_cum_ret_to_csv(equity_dict, equity_path)
 
-    return None
+#     return None
 
 # -------------------- main -------------------- #
 
 if __name__ == "__main__":
     print(torch.backends.mps.is_available(), torch.backends.mps.is_built())
-    # run_train_test_daily_raw()
-    # run_train_test_daily_risk()
-    # run_train_test_hourly_raw() # TEMP DONE
+    run_train_test_daily_raw()
+    run_train_test_daily_risk()
+    run_train_test_hourly_raw() 
     run_train_test_hourly_risk()
-    # run_train_test_30min_raw()
-    # run_train_test_30min_risk()
