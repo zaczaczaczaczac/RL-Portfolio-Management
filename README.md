@@ -11,9 +11,9 @@ Litao (John) Zhou: litao.zhou@mail.utoronto.ca
 
 ## Project Structure
 
-project/
-├─ src/
-│  ├─ main.py
-│  └─ utils.py
-└─ README.md
+    project/
+    ├─ src/
+    │  ├─ main.py
+    │  └─ utils.py
+    └─ README.md
 
