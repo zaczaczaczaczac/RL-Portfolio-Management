@@ -4,6 +4,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
+def ann_freq_for(freq_str: str) -> int:
+    """
+    Map data frequency string to number of periods per year
+    for annualization in ann_metrics.
+
+    - "daily"  -> 252 trading days
+    - "hourly" -> ~6 bars/day * 252
+    - "30min"  -> ~13 bars/day * 252
+    """
+    if freq_str == "daily":
+        return 252
+    if freq_str == "hourly":
+        return 252 * 6
+    if freq_str == "30min":
+        return 252 * 13
+    # fallback
+    return 252
+
 def ann_metrics(r: pd.Series, freq=252):
     mu = r.mean() * freq
     vol = r.std() * np.sqrt(freq)
